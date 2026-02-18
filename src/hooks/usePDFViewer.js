@@ -18,6 +18,24 @@ export function usePDFViewer() {
       };
     },
     methods: {
+      // 示例：从接口获取并加载 PDF
+      // async loadPDFFromApi() {
+      //   try {
+      //     const response = await axios.get("/api/pdf/download", {
+      //       responseType: "blob", // 必须指定为 blob
+      //     });
+
+      //     // 将 Blob 转换为 File 对象（File 是 Blob 的子类，增加了 name 属性）
+      //     const file = new File([response.data], "document.pdf", {
+      //       type: "application/pdf",
+      //     });
+
+      //     // 调用你 hook 中的方法
+      //     this.handleFileUpload(file);
+      //   } catch (error) {
+      //     console.error("加载远程文件失败", error);
+      //   }
+      // },
       // 文件上传处理
       handleFileUpload(uploadedFile) {
         this.file = uploadedFile;

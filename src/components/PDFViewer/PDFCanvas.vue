@@ -174,7 +174,9 @@ export default {
         // 检查文件类型
         console.log(
           "Loading PDF, file type:",
+          11111,
           this.file.constructor.name,
+          22222,
           this.file,
         );
 
