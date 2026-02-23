@@ -38,6 +38,22 @@ npm run serve
 npm run build
 ```
 
+## Docker 部署
+
+项目支持使用 Docker 进行快速部署：
+
+1. **构建镜像**
+```bash
+docker build -t pdf-vue-app .
+```
+
+2. **运行容器**
+```bash
+docker run -d -p 9099:80 --name pdf-vue-container pdf-vue-app
+```
+
+访问地址：[http://localhost:9099](http://localhost:9099)
+
 ## 技术栈
 
 - Vue 2.6
