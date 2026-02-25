@@ -413,13 +413,13 @@ export default {
   padding: 16px 0;
 }
 
-/deep/ .ant-collapse-header {
+::v-deep .ant-collapse-header {
   padding: 10px 16px 10px 40px !important;
   background: #fafafa;
   border-bottom: 1px solid #f0f0f0;
 }
 
-/deep/ .ant-collapse-content-box {
+::v-deep .ant-collapse-content-box {
   padding: 0 16px !important;
 }
 </style>
