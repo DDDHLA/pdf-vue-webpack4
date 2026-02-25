@@ -78,11 +78,16 @@ export default {
       type: String,
       required: true,
     },
+    previewScale: {
+      type: Number,
+      default: null,
+    },
   },
   data() {
     return {
       pdfDocument: null,
       pageRendered: {},
+      renderedScale: 1,
     };
   },
   computed: {
@@ -145,6 +150,11 @@ export default {
         this.renderCurrentPages();
       });
     },
+    previewScale(newVal) {
+      if (newVal !== null) {
+        this.updateCanvasPreview(newVal);
+      }
+    },
     rotation() {
       this.$nextTick(() => {
         this.renderCurrentPages();
@@ -163,6 +173,34 @@ export default {
         boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
         marginBottom: page === this.numPages ? 0 : "20px",
       };
+    },
+    // 拖动预览：只更新 canvas 的 CSS 尺寸，不重新渲染 PDF
+    updateCanvasPreview(newScale) {
+      const ratio = newScale / this.renderedScale;
+      const dpr = window.devicePixelRatio || 1;
+
+      const updateCanvas = (canvasRef) => {
+        let canvas;
+        if (Array.isArray(this.$refs[canvasRef])) {
+          canvas = this.$refs[canvasRef][0];
+        } else {
+          canvas = this.$refs[canvasRef];
+        }
+        if (!canvas) return;
+        canvas.style.width = (canvas.width / dpr) * ratio + "px";
+        canvas.style.height = (canvas.height / dpr) * ratio + "px";
+      };
+
+      if (this.viewMode === "scroll") {
+        for (let i = 1; i <= this.numPages; i++) {
+          updateCanvas(`canvas-${i}`);
+        }
+      } else {
+        updateCanvas("canvas-current");
+        if (this.viewMode === "double" && this.currentPage < this.numPages) {
+          updateCanvas("canvas-next");
+        }
+      }
     },
     async loadPDF() {
       try {
@@ -272,6 +310,7 @@ export default {
 
         await page.render(renderContext).promise;
         this.$set(this.pageRendered, pageNum, true);
+        this.renderedScale = this.scale;
       } catch (error) {
         console.error(`Error rendering page ${pageNum}:`, error);
       }

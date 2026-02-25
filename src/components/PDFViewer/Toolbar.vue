@@ -122,10 +122,11 @@
       <a-slider
         :min="30"
         :max="300"
-        :value="Math.round(scale * 100)"
+        :value="sliderDragValue !== null ? sliderDragValue : Math.round(scale * 100)"
         :style="{ flex: 1, margin: '0 8px' }"
         :tip-formatter="null"
-        @change="handleSliderChange"
+        @change="handleSliderPreview"
+        @afterChange="handleSliderChange"
       />
       <a-button type="text" size="small" @click="$emit('zoom-in')">
         <a-icon type="zoom-in" />
@@ -159,9 +160,15 @@ export default {
       required: true,
     },
   },
+  data() {
+    return {
+      sliderDragValue: null,
+    };
+  },
   computed: {
     scalePercent() {
-      return Math.round(this.scale * 100) + "%";
+      const value = this.sliderDragValue !== null ? this.sliderDragValue : Math.round(this.scale * 100);
+      return value + "%";
     },
     toolbarStyle() {
       return {
@@ -212,8 +219,16 @@ export default {
     handleScaleChange(value) {
       this.$emit("scale-change", parseFloat(value) / 100);
     },
-    handleSliderChange(value) {
-      this.$emit("scale-change", value / 100);
+    handleSliderPreview(value) {
+      this.sliderDragValue = value;
+      this.$emit("scale-preview", value / 100);
+    },
+    handleSliderChange() {
+      const value = this.sliderDragValue;
+      this.sliderDragValue = null;
+      if (value !== null) {
+        this.$emit("scale-change", value / 100);
+      }
     },
   },
 };

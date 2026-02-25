@@ -31,6 +31,7 @@
           :num-pages="numPages"
           :current-page="currentPage"
           :scale="scale"
+          :preview-scale="previewScale"
           :rotation="rotation"
           :view-mode="viewMode"
           @document-load-success="onDocumentLoadSuccess"
@@ -46,7 +47,8 @@
           @zoom-out="zoomOut"
           @reset-zoom="resetZoom"
           @rotate="rotatePage"
-          @scale-change="setCustomScale"
+          @scale-change="handleScaleChange"
+          @scale-preview="handleScalePreview"
           @fit-width="handleFitWidth"
           @fit-height="handleFitHeight"
           @fit-page="handleFitPage"
@@ -91,6 +93,7 @@ export default {
   data() {
     return {
       splitDialogVisible: false,
+      previewScale: null,
     };
   },
   computed: {
@@ -132,6 +135,13 @@ export default {
   methods: {
     handlePageLoadSuccess(dimensions) {
       this.pageDimensions = dimensions;
+    },
+    handleScalePreview(previewScale) {
+      this.previewScale = previewScale;
+    },
+    handleScaleChange(newScale) {
+      this.previewScale = null;
+      this.setCustomScale(newScale);
     },
     handleFitWidth() {
       if (this.$refs.container && this.pageDimensions) {
