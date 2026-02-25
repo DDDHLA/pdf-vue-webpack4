@@ -139,6 +139,14 @@
       >
         <a-icon type="fullscreen" />
       </a-button>
+      <a-button
+        type="text"
+        size="small"
+        @click="$emit('open-analysis-dialog')"
+        title="智能分析"
+      >
+        <a-icon type="bar-chart" />
+      </a-button>
     </div>
   </div>
 </template>

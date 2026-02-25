@@ -56,6 +56,7 @@
           @toggle-view-mode="setViewMode"
           @toggle-sidebar="sidebarVisible = !sidebarVisible"
           @open-split-dialog="splitDialogVisible = true"
+          @open-analysis-dialog="analysisDialogVisible = true"
           @download-word="downloadWord"
         />
       </div>
@@ -69,6 +70,12 @@
       @close="splitDialogVisible = false"
       @confirm="handleSplitConfirm"
     />
+
+    <!-- 智能分析弹窗 -->
+    <analysis-dialog
+      :visible="analysisDialogVisible"
+      @close="analysisDialogVisible = false"
+    />
   </div>
 </template>
 
@@ -79,6 +86,7 @@ import ThumbnailPanel from "@/components/PDFViewer/ThumbnailPanel.vue";
 import PDFCanvas from "@/components/PDFViewer/PDFCanvas.vue";
 import Toolbar from "@/components/PDFViewer/Toolbar.vue";
 import SplitDialog from "@/components/PDFViewer/SplitDialog.vue";
+import AnalysisDialog from "@/components/PDFViewer/AnalysisDialog.vue";
 
 export default {
   name: "PDFViewer",
@@ -88,11 +96,13 @@ export default {
     PDFCanvas: PDFCanvas,
     Toolbar,
     SplitDialog,
+    AnalysisDialog,
   },
   mixins: [usePDFViewer()],
   data() {
     return {
       splitDialogVisible: false,
+      analysisDialogVisible: false,
       previewScale: null,
     };
   },
