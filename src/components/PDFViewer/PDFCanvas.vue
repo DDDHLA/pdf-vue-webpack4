@@ -282,8 +282,12 @@ export default {
 
         // 考虑设备像素比，提高渲染质量
         const devicePixelRatio = window.devicePixelRatio || 1;
+        const targetScale = this.scale;
+        // 保证 renderScale × dpr >= 1.5，确保各种屏幕下文字都清晰
+        const minRenderScale = 1.5 / devicePixelRatio;
+        const renderScale = Math.max(targetScale, minRenderScale);
         const viewport = page.getViewport({
-          scale: this.scale * devicePixelRatio,
+          scale: renderScale * devicePixelRatio,
           rotation: this.rotation,
         });
 
@@ -292,8 +296,11 @@ export default {
         canvas.height = viewport.height;
 
         // 设置 canvas 显示尺寸
-        canvas.style.width = viewport.width / devicePixelRatio + "px";
-        canvas.style.height = viewport.height / devicePixelRatio + "px";
+        const cssScale = targetScale / renderScale;
+        canvas.style.width =
+          (viewport.width / devicePixelRatio) * cssScale + "px";
+        canvas.style.height =
+          (viewport.height / devicePixelRatio) * cssScale + "px";
 
         // 首次渲染时发送页面尺寸
         if (pageNum === 1 && !this.pageRendered[1]) {
@@ -310,7 +317,7 @@ export default {
 
         await page.render(renderContext).promise;
         this.$set(this.pageRendered, pageNum, true);
-        this.renderedScale = this.scale;
+        this.renderedScale = renderScale;
       } catch (error) {
         console.error(`Error rendering page ${pageNum}:`, error);
       }
