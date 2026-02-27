@@ -216,12 +216,26 @@ export default {
         const context = canvasEl.getContext("2d");
 
         // 设置缩略图尺寸（固定宽度120px）
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const containerWidth = 120;
         const viewport = page.getViewport({ scale: 1 });
-        const scale = 120 / viewport.width;
+
+        // 目标显示比例
+        const targetScale = containerWidth / viewport.width;
+        // 保证有效像素密度至少为 1.5，避免锯齿和模糊
+        const renderScale = Math.max(targetScale, 1.5 / devicePixelRatio);
+        const scale = renderScale * devicePixelRatio;
+
         const scaledViewport = page.getViewport({ scale });
 
         canvasEl.width = scaledViewport.width;
         canvasEl.height = scaledViewport.height;
+
+        // 设置显示尺寸，保持正确宽高比
+        const cssScale = targetScale / renderScale;
+        canvasEl.style.width = containerWidth + "px";
+        canvasEl.style.height =
+          (scaledViewport.height / devicePixelRatio) * cssScale + "px";
 
         const renderContext = {
           canvasContext: context,
