@@ -217,7 +217,7 @@ export default {
 
         // 设置缩略图尺寸（固定宽度120px）
         const devicePixelRatio = window.devicePixelRatio || 1;
-        const containerWidth = 120;
+        const containerWidth = 160;
         const viewport = page.getViewport({ scale: 1 });
 
         // 目标显示比例
@@ -418,7 +418,7 @@ export default {
 }
 
 .page-thumbnail {
-  width: 120px;
+  width: 160px;
   background: white;
   border: 1px solid #e8e8e8;
   border-radius: 2px;
