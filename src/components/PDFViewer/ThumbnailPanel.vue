@@ -284,16 +284,24 @@ export default {
         const devicePixelRatio = window.devicePixelRatio || 1;
         const containerWidth = 200;
         const viewport = page.getViewport({ scale: 1 });
-        const scale = (containerWidth / viewport.width) * devicePixelRatio;
+
+        // 目标显示比例
+        const targetScale = containerWidth / viewport.width;
+        // 保证缩略图的有效像素密度至少为 1.5，避免小尺寸下的严重锯齿
+        const renderScale = Math.max(targetScale, 1.5 / devicePixelRatio);
+        const scale = renderScale * devicePixelRatio;
+
         const scaledViewport = page.getViewport({ scale });
 
         // 设置 canvas 实际尺寸（高分辨率）
         canvas.width = scaledViewport.width;
         canvas.height = scaledViewport.height;
 
-        // 设置 canvas 显示尺寸
+        // 设置 canvas 显示尺寸（保持目标纵横比）
+        const cssScale = targetScale / renderScale;
         canvas.style.width = containerWidth + "px";
-        canvas.style.height = scaledViewport.height / devicePixelRatio + "px";
+        canvas.style.height =
+          (scaledViewport.height / devicePixelRatio) * cssScale + "px";
 
         const renderContext = {
           canvasContext: context,
