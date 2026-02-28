@@ -284,7 +284,13 @@ export default {
       // A. 页码校验
       // A1. 检查所有页码均已填写
       const hasEmptyPage = documents.some(
-        (doc) => doc.startPage == null || doc.endPage == null,
+        (doc) =>
+          doc.startPage === null ||
+          doc.startPage === undefined ||
+          doc.startPage === "" ||
+          doc.endPage === null ||
+          doc.endPage === undefined ||
+          doc.endPage === "",
       );
       if (hasEmptyPage) {
         this.$message.warning("部分页码尚未填写，请调整");
@@ -356,6 +362,7 @@ export default {
         );
         this.$confirm({
           title: "存在以下文档类型的要素尚未填写补全，是否确认继续提交?",
+          icon: "exclamation-circle",
           content: h("div", { style: { marginTop: "8px" } }, listItems),
           okText: "继续",
           cancelText: "取消",
