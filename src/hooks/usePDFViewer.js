@@ -7,9 +7,11 @@ export function usePDFViewer() {
   return {
     data() {
       return {
-        file: null,
-        numPages: 0,
+        files: [],
+        fileInfoList: [],
+        totalPages: 0,
         currentPage: 1,
+        activeFileIndex: 0,
         scale: 1.0,
         rotation: 0,
         viewMode: "single", // 'single' | 'double' | 'scroll'
@@ -17,42 +19,71 @@ export function usePDFViewer() {
         pageDimensions: null,
       };
     },
+    watch: {
+      currentPage(newPage) {
+        // 翻页跨文件时自动同步 activeFileIndex
+        const resolved = this.resolveGlobalPage(newPage);
+        if (resolved && resolved.fileIndex !== this.activeFileIndex) {
+          this.activeFileIndex = resolved.fileIndex;
+        }
+      },
+    },
     methods: {
-      // 示例：从接口获取并加载 PDF
-      // async loadPDFFromApi() {
-      //   try {
-      //     const response = await axios.get("/api/pdf/download", {
-      //       responseType: "blob", // 必须指定为 blob
-      //     });
-
-      //     // 将 Blob 转换为 File 对象（File 是 Blob 的子类，增加了 name 属性）
-      //     const file = new File([response.data], "document.pdf", {
-      //       type: "application/pdf",
-      //     });
-
-      //     // 调用你 hook 中的方法
-      //     this.handleFileUpload(file);
-      //   } catch (error) {
-      //     console.error("加载远程文件失败", error);
-      //   }
-      // },
-      // 文件上传处理
-      handleFileUpload(uploadedFile) {
-        this.file = uploadedFile;
+      // 多文件上传处理
+      handleFilesUpload(uploadedFiles) {
+        this.files = uploadedFiles;
         this.currentPage = 1;
         this.scale = 1.0;
         this.rotation = 0;
+        this.activeFileIndex = 0;
+        this.fileInfoList = [];
+        this.totalPages = 0;
       },
 
-      // 文档加载完成
+      // 全局页码 → { fileIndex, localPage }
+      resolveGlobalPage(globalPage) {
+        for (let i = 0; i < this.fileInfoList.length; i++) {
+          const info = this.fileInfoList[i];
+          if (
+            globalPage >= info.globalStartPage &&
+            globalPage <= info.globalEndPage
+          ) {
+            return {
+              fileIndex: i,
+              localPage: globalPage - info.globalStartPage + 1,
+              fileInfo: info,
+            };
+          }
+        }
+        return null;
+      },
+
+      // 文件标签点击：跳转到指定文件首页
+      handleFileTabClick(fileIndex) {
+        this.activeFileIndex = fileIndex;
+        const info = this.fileInfoList[fileIndex];
+        if (info) {
+          this.currentPage = info.globalStartPage;
+        }
+      },
+
+      // 所有文档加载完成
+      handleAllDocumentsLoaded({ totalPages, fileInfoList }) {
+        this.totalPages = totalPages;
+        this.fileInfoList = fileInfoList;
+        this.currentPage = 1;
+        this.activeFileIndex = 0;
+      },
+
+      // 文档加载完成（兼容）
       onDocumentLoadSuccess(pdf) {
-        this.numPages = pdf.numPages;
+        this.totalPages = pdf.numPages;
         this.currentPage = 1;
       },
 
       // 页面导航
       goToPage(page) {
-        if (page >= 1 && page <= this.numPages) {
+        if (page >= 1 && page <= this.totalPages) {
           this.currentPage = page;
         }
       },
@@ -66,11 +97,11 @@ export function usePDFViewer() {
       },
 
       goToNextPage() {
-        this.currentPage = Math.min(this.currentPage + 1, this.numPages);
+        this.currentPage = Math.min(this.currentPage + 1, this.totalPages);
       },
 
       goToLastPage() {
-        this.currentPage = this.numPages;
+        this.currentPage = this.totalPages;
       },
 
       // 缩放控制
@@ -116,21 +147,25 @@ export function usePDFViewer() {
         this.rotation = (this.rotation + 90) % 360;
       },
 
-      // 下载 PDF
+      // 下载 PDF（使用当前活跃文件）
       downloadPDF() {
-        if (this.file) {
-          const url = URL.createObjectURL(this.file);
+        const activeFile =
+          this.fileInfoList[this.activeFileIndex]?.file || this.files[0];
+        if (activeFile) {
+          const url = URL.createObjectURL(activeFile);
           const a = document.createElement("a");
           a.href = url;
-          a.download = this.file.name;
+          a.download = activeFile.name;
           a.click();
           URL.revokeObjectURL(url);
         }
       },
 
-      // 下载 Word (提取文本)
+      // 下载 Word (提取文本，使用当前活跃文件)
       async downloadWord() {
-        if (!this.file) return;
+        const activeFile =
+          this.fileInfoList[this.activeFileIndex]?.file || this.files[0];
+        if (!activeFile) return;
 
         try {
           // 读取文件内容
@@ -138,7 +173,7 @@ export function usePDFViewer() {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.onerror = reject;
-            reader.readAsArrayBuffer(this.file);
+            reader.readAsArrayBuffer(activeFile);
           });
 
           // 加载 PDF
@@ -150,7 +185,7 @@ export function usePDFViewer() {
                   xmlns='http://www.w3.org/TR/REC-html40'>
             <head>
               <meta charset='utf-8'>
-              <title>${this.file.name}</title>
+              <title>${activeFile.name}</title>
               <style>
                 body { font-family: 'SimSun', '宋体', sans-serif; }
                 p { margin-bottom: 10px; line-height: 1.5; }
@@ -165,12 +200,9 @@ export function usePDFViewer() {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
 
-            // 简单的文本拼接，尝试保留一些结构
-            // 这里的 textContent.items 包含 str (文本), transform (位置) 等信息
-            // 简单处理：直接拼接字符串，每项之间加空格，最后加换行
             const pageText = textContent.items
               .map((item) => item.str)
-              .join(" "); // 或者尝试根据 y 坐标换行，这里先简单处理
+              .join(" ");
 
             docContent += `
               <div class="page">
@@ -185,7 +217,8 @@ export function usePDFViewer() {
           // 创建 Blob 并下载
           const blob = new Blob([docContent], { type: "application/msword" });
           const url = URL.createObjectURL(blob);
-          const fileName = this.file.name.replace(/\.pdf$/i, "") + ".doc";
+          const fileName =
+            activeFile.name.replace(/\.pdf$/i, "") + ".doc";
 
           const a = document.createElement("a");
           a.href = url;

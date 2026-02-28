@@ -1,28 +1,63 @@
 <template>
-  <div v-if="file && numPages > 0" :style="panelStyle">
+  <div v-if="files.length > 0 && totalPages > 0" :style="panelStyle">
     <!-- 顶部标题 -->
     <div :style="headerStyle">缩略图</div>
 
-    <!-- 中间缩略图列表 -->
-    <div :style="listStyle">
+    <!-- 文件导航栏 -->
+    <div v-if="fileInfoList.length > 1" :style="fileNavStyle">
       <div
-        v-for="page in numPages"
-        :key="page"
-        :style="getThumbnailStyle(page)"
-        @click="$emit('page-click', page)"
-        @mouseenter="handleMouseEnter($event, page)"
-        @mouseleave="handleMouseLeave($event, page)"
+        :style="getNavArrowStyle(activeFileIndex <= 0)"
+        @click="goToPrevFile"
+      >
+        <a-icon type="left" :style="{ fontSize: '12px' }" />
+      </div>
+      <div ref="fileNavScroll" :style="fileNavScrollStyle">
+        <div
+          v-for="(info, index) in fileInfoList"
+          :key="index"
+          :ref="'fileTab-' + index"
+          :style="getFileTabStyle(index)"
+          :title="info.name"
+          @click="handleFileTabClick(index)"
+        >
+          <div :style="fileTabNameStyle">{{ truncateName(info.name) }}</div>
+          <div :style="fileTabPageStyle">
+            {{ info.globalStartPage }}-{{ info.globalEndPage }}页
+          </div>
+        </div>
+      </div>
+      <div
+        :style="getNavArrowStyle(activeFileIndex >= fileInfoList.length - 1)"
+        @click="goToNextFile"
+      >
+        <a-icon type="right" :style="{ fontSize: '12px' }" />
+      </div>
+    </div>
+
+    <!-- 中间缩略图列表（所有文件连续滚动） -->
+    <div ref="thumbnailList" :style="listStyle">
+      <div
+        v-for="globalPage in totalPages"
+        :key="globalPage"
+        :ref="'thumbnailItem-' + globalPage"
+        :style="getThumbnailStyle(globalPage)"
+        @click="$emit('page-click', globalPage)"
+        @mouseenter="handleMouseEnter($event, globalPage)"
+        @mouseleave="handleMouseLeave($event, globalPage)"
       >
         <div :style="thumbnailContentStyle">
           <div
-            v-if="!thumbnailRendered[page]"
+            v-if="!thumbnailRendered[globalPage]"
             :style="{ padding: '60px 20px', textAlign: 'center' }"
           >
             <a-spin size="small" />
           </div>
-          <canvas v-show="thumbnailRendered[page]" :ref="'thumbnail-' + page" />
+          <canvas
+            v-show="thumbnailRendered[globalPage]"
+            :ref="'thumbnail-' + globalPage"
+          />
         </div>
-        <div :style="pageNumberStyle">第{{ page }}页</div>
+        <div :style="pageNumberStyle">第{{ globalPage }}页</div>
       </div>
     </div>
 
@@ -47,11 +82,11 @@
       >
         <a-icon type="left" :style="{ fontSize: '12px', color: '#666' }" />
       </a-button>
-      <div :style="pageIndicatorStyle">{{ currentPage }} / {{ numPages }}</div>
+      <div :style="pageIndicatorStyle">{{ currentPage }} / {{ totalPages }}</div>
       <a-button
         type="text"
         size="small"
-        :disabled="currentPage === numPages"
+        :disabled="currentPage === totalPages"
         @click="$emit('next-page')"
       >
         <a-icon type="right" :style="{ fontSize: '12px', color: '#666' }" />
@@ -59,7 +94,7 @@
       <a-button
         type="text"
         size="small"
-        :disabled="currentPage === numPages"
+        :disabled="currentPage === totalPages"
         @click="$emit('last-page')"
       >
         <a-icon
@@ -80,11 +115,19 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 export default {
   name: "ThumbnailPanel",
   props: {
-    file: {
-      type: [File, Object],
-      default: null,
+    files: {
+      type: Array,
+      default: () => [],
     },
-    numPages: {
+    fileInfoList: {
+      type: Array,
+      default: () => [],
+    },
+    activeFileIndex: {
+      type: Number,
+      default: 0,
+    },
+    totalPages: {
       type: Number,
       required: true,
     },
@@ -95,7 +138,7 @@ export default {
   },
   data() {
     return {
-      pdfDocument: null,
+      pdfDocuments: {},
       thumbnailRendered: {},
     };
   },
@@ -122,6 +165,45 @@ export default {
         fontWeight: 500,
         color: "#333",
         flexShrink: 0,
+      };
+    },
+    fileNavStyle() {
+      return {
+        display: "flex",
+        alignItems: "center",
+        height: "44px",
+        borderBottom: "1px solid #f0f0f0",
+        background: "#fafafa",
+        flexShrink: 0,
+        padding: "0 4px",
+      };
+    },
+    fileNavScrollStyle() {
+      return {
+        flex: 1,
+        display: "flex",
+        overflowX: "auto",
+        overflowY: "hidden",
+        gap: "4px",
+        padding: "4px 0",
+        scrollbarWidth: "none",
+      };
+    },
+    fileTabNameStyle() {
+      return {
+        fontSize: "11px",
+        lineHeight: "1.2",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        maxWidth: "80px",
+      };
+    },
+    fileTabPageStyle() {
+      return {
+        fontSize: "10px",
+        lineHeight: "1.2",
+        opacity: 0.8,
       };
     },
     listStyle() {
@@ -181,18 +263,72 @@ export default {
     },
   },
   watch: {
-    file: {
-      immediate: true,
-      handler(newFile) {
-        if (newFile) {
-          this.loadPDF();
+    fileInfoList: {
+      handler(newList) {
+        if (newList.length > 0) {
+          this.loadAllPDFs();
         }
       },
     },
   },
   methods: {
-    getThumbnailStyle(page) {
-      const isActive = this.currentPage === page;
+    // 全局页码 → { fileIndex, localPage }
+    resolveGlobalPage(globalPage) {
+      for (let i = 0; i < this.fileInfoList.length; i++) {
+        const info = this.fileInfoList[i];
+        if (
+          globalPage >= info.globalStartPage &&
+          globalPage <= info.globalEndPage
+        ) {
+          return {
+            fileIndex: i,
+            localPage: globalPage - info.globalStartPage + 1,
+          };
+        }
+      }
+      return null;
+    },
+    truncateName(name) {
+      const nameWithoutExt = name.replace(/\.pdf$/i, "");
+      if (nameWithoutExt.length > 8) {
+        return nameWithoutExt.substring(0, 7) + "…";
+      }
+      return nameWithoutExt;
+    },
+    getFileTabStyle(index) {
+      const isActive = index === this.activeFileIndex;
+      return {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "2px 10px",
+        borderRadius: "4px",
+        cursor: "pointer",
+        flexShrink: 0,
+        whiteSpace: "nowrap",
+        background: isActive ? "#1890ff" : "transparent",
+        color: isActive ? "#fff" : "#333",
+        transition: "all 0.2s",
+        minWidth: "60px",
+      };
+    },
+    getNavArrowStyle(disabled) {
+      return {
+        width: "22px",
+        height: "30px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: disabled ? "not-allowed" : "pointer",
+        color: disabled ? "#ccc" : "#666",
+        flexShrink: 0,
+        borderRadius: "4px",
+        background: "#eee",
+      };
+    },
+    getThumbnailStyle(globalPage) {
+      const isActive = this.currentPage === globalPage;
       return {
         cursor: "pointer",
         border: isActive ? "2px solid #ff4d4f" : "2px solid #e0e0e0",
@@ -207,97 +343,141 @@ export default {
         flexShrink: 0,
       };
     },
-    handleMouseEnter(event, page) {
-      if (this.currentPage !== page) {
+    handleMouseEnter(event, globalPage) {
+      if (this.currentPage !== globalPage) {
         event.currentTarget.style.borderColor = "#1890ff";
         event.currentTarget.style.boxShadow =
           "0 2px 8px rgba(24, 144, 255, 0.2)";
       }
     },
-    handleMouseLeave(event, page) {
-      if (this.currentPage !== page) {
+    handleMouseLeave(event, globalPage) {
+      if (this.currentPage !== globalPage) {
         event.currentTarget.style.borderColor = "#e0e0e0";
         event.currentTarget.style.boxShadow = "none";
       }
     },
-    async loadPDF() {
-      try {
-        if (!this.file) {
-          console.error("No file provided");
-          return;
+    handleFileTabClick(fileIndex) {
+      this.$emit("file-tab-click", fileIndex);
+      // 滚动缩略图列表到对应文件的第一页
+      const info = this.fileInfoList[fileIndex];
+      if (info) {
+        this.$nextTick(() => {
+          this.scrollToThumbnail(info.globalStartPage);
+        });
+      }
+      // 滚动导航栏标签
+      this.$nextTick(() => {
+        const tabRef = this.$refs["fileTab-" + fileIndex];
+        const tab = Array.isArray(tabRef) ? tabRef[0] : tabRef;
+        if (tab && this.$refs.fileNavScroll) {
+          tab.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
         }
+      });
+    },
+    scrollToThumbnail(globalPage) {
+      const itemRef = this.$refs["thumbnailItem-" + globalPage];
+      const item = Array.isArray(itemRef) ? itemRef[0] : itemRef;
+      if (item && this.$refs.thumbnailList) {
+        item.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    },
+    goToNextFile() {
+      if (this.activeFileIndex < this.fileInfoList.length - 1) {
+        this.handleFileTabClick(this.activeFileIndex + 1);
+      }
+    },
+    goToPrevFile() {
+      if (this.activeFileIndex > 0) {
+        this.handleFileTabClick(this.activeFileIndex - 1);
+      }
+    },
+    // 读取文件为 ArrayBuffer
+    readFileAsArrayBuffer(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+    },
+    // 按需获取 pdfDocument（带缓存）
+    async getPdfDocument(fileIndex) {
+      if (this.pdfDocuments[fileIndex]) {
+        return this.pdfDocuments[fileIndex];
+      }
+      const file = this.files[fileIndex];
+      if (!file) return null;
 
-        const fileReader = new FileReader();
-        fileReader.onload = async (e) => {
-          try {
-            const typedArray = new Uint8Array(e.target.result);
-            this.pdfDocument = await pdfjsLib.getDocument(typedArray).promise;
-            // 等待 DOM 更新后再渲染
-            await this.$nextTick();
-            // 延迟一点确保所有 canvas 元素都已创建
-            setTimeout(() => {
-              this.renderAllThumbnails();
-            }, 100);
-          } catch (err) {
-            console.error("Error parsing PDF for thumbnails:", err);
+      const arrayBuffer = await this.readFileAsArrayBuffer(file);
+      const typedArray = new Uint8Array(arrayBuffer);
+      const doc = await pdfjsLib.getDocument(typedArray).promise;
+      this.$set(this.pdfDocuments, fileIndex, doc);
+      return doc;
+    },
+    // 加载所有 PDF 并渲染全部缩略图
+    async loadAllPDFs() {
+      try {
+        // 清除旧状态
+        this.thumbnailRendered = {};
+
+        // 依次加载每个文件并渲染缩略图
+        for (let i = 0; i < this.fileInfoList.length; i++) {
+          const doc = await this.getPdfDocument(i);
+          if (!doc) continue;
+
+          const info = this.fileInfoList[i];
+          await this.$nextTick();
+
+          // 渲染该文件的所有缩略图
+          for (let localPage = 1; localPage <= info.pageCount; localPage++) {
+            const globalPage = info.globalStartPage + localPage - 1;
+            await this.renderThumbnail(doc, localPage, globalPage);
           }
-        };
-        fileReader.onerror = (error) => {
-          console.error("FileReader error:", error);
-        };
-        fileReader.readAsArrayBuffer(this.file);
+        }
       } catch (error) {
-        console.error("Error loading PDF:", error);
+        console.error("Error loading PDFs for thumbnails:", error);
       }
     },
-    async renderAllThumbnails() {
-      if (!this.pdfDocument) return;
-
-      // 逐个渲染缩略图
-      for (let i = 1; i <= this.pdfDocument.numPages; i++) {
-        await this.renderThumbnail(i);
-      }
-    },
-    async renderThumbnail(pageNum) {
-      if (!this.pdfDocument) return;
+    async renderThumbnail(pdfDocument, localPage, globalPage) {
+      if (!pdfDocument) return;
 
       try {
-        const page = await this.pdfDocument.getPage(pageNum);
+        const page = await pdfDocument.getPage(localPage);
 
-        // 获取 canvas 元素
-        const refName = "thumbnail-" + pageNum;
+        const refName = "thumbnail-" + globalPage;
         let canvas = this.$refs[refName];
 
-        // 如果是数组，取第一个元素
         if (Array.isArray(canvas)) {
           canvas = canvas[0];
         }
 
         if (!canvas) {
-          console.warn(`Canvas not found for thumbnail ${pageNum}`);
+          console.warn(`Canvas not found for thumbnail ${globalPage}`);
           return;
         }
 
         const context = canvas.getContext("2d");
 
-        // 考虑设备像素比，提高渲染质量
         const devicePixelRatio = window.devicePixelRatio || 1;
         const containerWidth = 200;
         const viewport = page.getViewport({ scale: 1 });
 
-        // 目标显示比例
         const targetScale = containerWidth / viewport.width;
-        // 保证缩略图的有效像素密度至少为 1.5，避免小尺寸下的严重锯齿
         const renderScale = Math.max(targetScale, 1.5 / devicePixelRatio);
         const scale = renderScale * devicePixelRatio;
 
         const scaledViewport = page.getViewport({ scale });
 
-        // 设置 canvas 实际尺寸（高分辨率）
         canvas.width = scaledViewport.width;
         canvas.height = scaledViewport.height;
 
-        // 设置 canvas 显示尺寸（保持目标纵横比）
         const cssScale = targetScale / renderScale;
         canvas.style.width = containerWidth + "px";
         canvas.style.height =
@@ -309,23 +489,28 @@ export default {
         };
 
         await page.render(renderContext).promise;
-        this.$set(this.thumbnailRendered, pageNum, true);
+        this.$set(this.thumbnailRendered, globalPage, true);
       } catch (error) {
-        console.error(`Error rendering thumbnail ${pageNum}:`, error);
+        console.error(`Error rendering thumbnail ${globalPage}:`, error);
       }
     },
   },
   beforeDestroy() {
-    if (this.pdfDocument) {
-      this.pdfDocument.destroy();
-    }
+    Object.values(this.pdfDocuments).forEach((doc) => {
+      if (doc) doc.destroy();
+    });
+    this.pdfDocuments = {};
   },
 };
 </script>
 
 <style scoped>
-/* 移除所有 canvas 样式限制，让它保持原始渲染尺寸 */
 canvas {
   display: block;
+}
+/* 隐藏文件导航栏的滚动条 */
+div::-webkit-scrollbar {
+  height: 0;
+  width: 0;
 }
 </style>

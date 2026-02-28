@@ -1,10 +1,10 @@
 <template>
-  <div v-if="file" :style="containerStyle">
+  <div v-if="files.length > 0" :style="containerStyle">
     <div :style="contentStyle">
       <!-- 滚动模式：渲染所有页面 -->
       <div v-if="viewMode === 'scroll'" :style="scrollContainerStyle">
         <div
-          v-for="page in numPages"
+          v-for="page in totalPages"
           :key="page"
           :style="getPageWrapperStyle(page)"
         >
@@ -29,7 +29,7 @@
 
         <!-- 第二页 (如果是双页模式且不是最后一页) -->
         <div
-          v-if="viewMode === 'double' && currentPage < numPages"
+          v-if="viewMode === 'double' && currentPage < totalPages"
           :style="pageWrapperStyle"
         >
           <a-spin v-if="!pageRendered[currentPage + 1]" tip="渲染中..." />
@@ -54,11 +54,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 export default {
   name: "PDFCanvas",
   props: {
-    file: {
-      type: [File, Object],
-      default: null,
+    files: {
+      type: Array,
+      default: () => [],
     },
-    numPages: {
+    fileInfoList: {
+      type: Array,
+      default: () => [],
+    },
+    totalPages: {
       type: Number,
       required: true,
     },
@@ -85,7 +89,7 @@ export default {
   },
   data() {
     return {
-      pdfDocument: null,
+      pdfDocuments: {},
       pageRendered: {},
       renderedScale: 1,
     };
@@ -132,11 +136,11 @@ export default {
     },
   },
   watch: {
-    file: {
+    files: {
       immediate: true,
-      handler(newFile) {
-        if (newFile) {
-          this.loadPDF();
+      handler(newFiles) {
+        if (newFiles && newFiles.length > 0) {
+          this.loadAllPDFs();
         }
       },
     },
@@ -171,8 +175,78 @@ export default {
       return {
         background: "white",
         boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        marginBottom: page === this.numPages ? 0 : "20px",
+        marginBottom: page === this.totalPages ? 0 : "20px",
       };
+    },
+    // 全局页码 → { fileIndex, localPage }
+    resolveGlobalPage(globalPage) {
+      for (let i = 0; i < this.fileInfoList.length; i++) {
+        const info = this.fileInfoList[i];
+        if (
+          globalPage >= info.globalStartPage &&
+          globalPage <= info.globalEndPage
+        ) {
+          return {
+            fileIndex: i,
+            localPage: globalPage - info.globalStartPage + 1,
+          };
+        }
+      }
+      return null;
+    },
+    // 读取文件为 ArrayBuffer
+    readFileAsArrayBuffer(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+    },
+    // 按需获取 pdfDocument（带缓存）
+    async getPdfDocument(fileIndex) {
+      if (this.pdfDocuments[fileIndex]) {
+        return this.pdfDocuments[fileIndex];
+      }
+      const file = this.files[fileIndex];
+      if (!file) return null;
+
+      const arrayBuffer = await this.readFileAsArrayBuffer(file);
+      const typedArray = new Uint8Array(arrayBuffer);
+      const doc = await pdfjsLib.getDocument(typedArray).promise;
+      this.$set(this.pdfDocuments, fileIndex, doc);
+      return doc;
+    },
+    // 加载所有 PDF，构建 fileInfoList
+    async loadAllPDFs() {
+      try {
+        let totalPages = 0;
+        const infoList = [];
+
+        for (let i = 0; i < this.files.length; i++) {
+          const doc = await this.getPdfDocument(i);
+          const pageCount = doc.numPages;
+          infoList.push({
+            file: this.files[i],
+            name: this.files[i].name,
+            pageCount,
+            globalStartPage: totalPages + 1,
+            globalEndPage: totalPages + pageCount,
+          });
+          totalPages += pageCount;
+        }
+
+        this.$emit("all-documents-loaded", {
+          totalPages,
+          fileInfoList: infoList,
+        });
+
+        this.$nextTick(() => {
+          this.renderCurrentPages();
+        });
+      } catch (err) {
+        console.error("Error loading PDFs:", err);
+      }
     },
     // 拖动预览：只更新 canvas 的 CSS 尺寸，不重新渲染 PDF
     updateCanvasPreview(newScale) {
@@ -192,81 +266,41 @@ export default {
       };
 
       if (this.viewMode === "scroll") {
-        for (let i = 1; i <= this.numPages; i++) {
+        for (let i = 1; i <= this.totalPages; i++) {
           updateCanvas(`canvas-${i}`);
         }
       } else {
         updateCanvas("canvas-current");
-        if (this.viewMode === "double" && this.currentPage < this.numPages) {
+        if (this.viewMode === "double" && this.currentPage < this.totalPages) {
           updateCanvas("canvas-next");
         }
       }
     },
-    async loadPDF() {
-      try {
-        if (!this.file) {
-          console.error("No file provided");
-          return;
-        }
-
-        // 检查文件类型
-        console.log(
-          "Loading PDF, file type:",
-          11111,
-          this.file.constructor.name,
-          22222,
-          this.file,
-        );
-
-        const fileReader = new FileReader();
-        fileReader.onload = async (e) => {
-          try {
-            const typedArray = new Uint8Array(e.target.result);
-            this.pdfDocument = await pdfjsLib.getDocument(typedArray).promise;
-            this.$emit("document-load-success", {
-              numPages: this.pdfDocument.numPages,
-            });
-            this.$nextTick(() => {
-              this.renderCurrentPages();
-            });
-          } catch (err) {
-            console.error("Error parsing PDF:", err);
-          }
-        };
-        fileReader.onerror = (error) => {
-          console.error("FileReader error:", error);
-        };
-        fileReader.readAsArrayBuffer(this.file);
-      } catch (error) {
-        console.error("Error loading PDF:", error);
-      }
-    },
     async renderCurrentPages() {
-      if (!this.pdfDocument) return;
+      if (this.fileInfoList.length === 0) return;
 
       if (this.viewMode === "scroll") {
-        // 滚动模式：渲染所有页面
-        for (let i = 1; i <= this.pdfDocument.numPages; i++) {
+        for (let i = 1; i <= this.totalPages; i++) {
           await this.renderPage(i, `canvas-${i}`);
         }
       } else {
-        // 翻页模式：渲染当前页
         await this.renderPage(this.currentPage, "canvas-current");
 
-        // 双页模式：渲染下一页
-        if (
-          this.viewMode === "double" &&
-          this.currentPage < this.pdfDocument.numPages
-        ) {
+        if (this.viewMode === "double" && this.currentPage < this.totalPages) {
           await this.renderPage(this.currentPage + 1, "canvas-next");
         }
       }
     },
-    async renderPage(pageNum, canvasRef) {
-      if (!this.pdfDocument) return;
+    async renderPage(globalPage, canvasRef) {
+      // 解析全局页码
+      const resolved = this.resolveGlobalPage(globalPage);
+      if (!resolved) return;
 
       try {
-        const page = await this.pdfDocument.getPage(pageNum);
+        const doc = await this.getPdfDocument(resolved.fileIndex);
+        if (!doc) return;
+
+        const page = await doc.getPage(resolved.localPage);
 
         // 获取 canvas 元素
         let canvas;
@@ -283,7 +317,6 @@ export default {
         // 考虑设备像素比，提高渲染质量
         const devicePixelRatio = window.devicePixelRatio || 1;
         const targetScale = this.scale;
-        // 保证 renderScale × dpr >= 1.5，确保各种屏幕下文字都清晰
         const minRenderScale = 1.5 / devicePixelRatio;
         const renderScale = Math.max(targetScale, minRenderScale);
         const viewport = page.getViewport({
@@ -303,7 +336,7 @@ export default {
           (viewport.height / devicePixelRatio) * cssScale + "px";
 
         // 首次渲染时发送页面尺寸
-        if (pageNum === 1 && !this.pageRendered[1]) {
+        if (globalPage === 1 && !this.pageRendered[1]) {
           this.$emit("page-load-success", {
             width: page.view[2],
             height: page.view[3],
@@ -316,17 +349,19 @@ export default {
         };
 
         await page.render(renderContext).promise;
-        this.$set(this.pageRendered, pageNum, true);
+        this.$set(this.pageRendered, globalPage, true);
         this.renderedScale = renderScale;
       } catch (error) {
-        console.error(`Error rendering page ${pageNum}:`, error);
+        console.error(`Error rendering page ${globalPage}:`, error);
       }
     },
   },
   beforeDestroy() {
-    if (this.pdfDocument) {
-      this.pdfDocument.destroy();
-    }
+    // 销毁所有缓存的 pdfDocument
+    Object.values(this.pdfDocuments).forEach((doc) => {
+      if (doc) doc.destroy();
+    });
+    this.pdfDocuments = {};
   },
 };
 </script>

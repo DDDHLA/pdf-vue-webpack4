@@ -1,10 +1,10 @@
 <template>
   <div ref="viewer" class="viewer-wrapper" :style="viewerStyle">
     <!-- 上传区域（无文件时显示） -->
-    <upload-area v-if="!file" @file-upload="handleFileUpload" />
+    <upload-area v-if="files.length === 0" @files-upload="handleFilesUpload" />
 
     <!-- PDF 查看器（有文件时显示） -->
-    <template v-if="file">
+    <template v-if="files.length > 0">
       <!-- 第一行头部：标题 + 操作按钮 -->
       <div class="top-header">
         <span class="top-header-title">融资业务-材料复核</span>
@@ -45,10 +45,13 @@
         <!-- 左侧缩略图面板 -->
         <thumbnail-panel
           v-if="sidebarVisible"
-          :file="file"
-          :num-pages="numPages"
+          :files="files"
+          :file-info-list="fileInfoList"
+          :active-file-index="activeFileIndex"
+          :total-pages="totalPages"
           :current-page="currentPage"
           @page-click="goToPage"
+          @file-tab-click="handleFileTabClick"
           @first-page="goToFirstPage"
           @prev-page="goToPrevPage"
           @next-page="goToNextPage"
@@ -59,19 +62,22 @@
         <div ref="container" :style="containerStyle">
           <!-- 顶部文件名 -->
           <div :style="headerStyle">
-            文件名称：<span style="color: #ff4d4f">{{ file.name }}</span>
+            文件名称：<span style="color: #ff4d4f">{{
+              currentFileName
+            }}</span>
           </div>
 
           <!-- PDF 画布 -->
           <p-d-f-canvas
-            :file="file"
-            :num-pages="numPages"
+            :files="files"
+            :file-info-list="fileInfoList"
+            :total-pages="totalPages"
             :current-page="currentPage"
             :scale="scale"
             :preview-scale="previewScale"
             :rotation="rotation"
             :view-mode="viewMode"
-            @document-load-success="onDocumentLoadSuccess"
+            @all-documents-loaded="handleAllDocumentsLoaded"
             @page-load-success="handlePageLoadSuccess"
           />
 
@@ -98,15 +104,15 @@
           />
         </div>
         <!-- 右侧智能处理面板 -->
-        <analysis-panel v-if="file" />
+        <analysis-panel v-if="files.length > 0" />
       </div>
     </template>
 
     <!-- 拆分配置弹窗 -->
     <split-dialog
       :visible="splitDialogVisible"
-      :num-pages="numPages"
-      :file="file"
+      :num-pages="activeFilePageCount"
+      :file="activeFile"
       @close="splitDialogVisible = false"
       @confirm="handleSplitConfirm"
     />
@@ -141,6 +147,18 @@ export default {
     };
   },
   computed: {
+    currentFileName() {
+      const info = this.fileInfoList[this.activeFileIndex];
+      return info ? info.name : (this.files[0] && this.files[0].name) || "";
+    },
+    activeFile() {
+      const info = this.fileInfoList[this.activeFileIndex];
+      return info ? info.file : this.files[0] || null;
+    },
+    activeFilePageCount() {
+      const info = this.fileInfoList[this.activeFileIndex];
+      return info ? info.pageCount : 0;
+    },
     viewerStyle() {
       return {
         display: "flex",
@@ -192,7 +210,7 @@ export default {
       if (this.$refs.container && this.pageDimensions) {
         const availableWidth = this.$refs.container.clientWidth - 100;
         const isDouble =
-          this.viewMode === "double" && this.currentPage < this.numPages;
+          this.viewMode === "double" && this.currentPage < this.totalPages;
         const targetWidth = isDouble
           ? this.pageDimensions.width * 2 + 20
           : this.pageDimensions.width;
@@ -210,7 +228,7 @@ export default {
         const availableWidth = this.$refs.container.clientWidth - 100;
         const availableHeight = this.$refs.container.clientHeight - 168;
         const isDouble =
-          this.viewMode === "double" && this.currentPage < this.numPages;
+          this.viewMode === "double" && this.currentPage < this.totalPages;
         const targetWidth = isDouble
           ? this.pageDimensions.width * 2 + 20
           : this.pageDimensions.width;
@@ -240,7 +258,6 @@ export default {
     },
     handleSplitConfirm(splits) {
       console.log("拆分方案:", splits);
-      // 后续可以调用PDF拆分API
       this.splitDialogVisible = false;
       this.$message.success(`已生成 ${splits.length} 个拆分段落`);
     },
