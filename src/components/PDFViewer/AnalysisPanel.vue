@@ -98,6 +98,11 @@
                       size="default"
                       style="width: 100%"
                       :placeholder="field.placeholder"
+                      @change="
+                        (date, dateString) => {
+                          field.value = dateString || null;
+                        }
+                      "
                     />
                   </template>
                   <template v-else-if="field.suffix">
@@ -152,7 +157,8 @@ export default {
           id: "1",
           startPage: 1,
           endPage: 1,
-          docType: "融资人营业执照",
+          // docType: "融资人营业执照",
+          docType: "",
           status: "待复核",
           formType: "form",
           fields: [
@@ -174,7 +180,7 @@ export default {
           endPage: 3,
           docType: "融资人身份证",
           status: "待复核",
-          formType: "text",
+          formType: "form",
           fields: [
             { label: "姓名", value: "XXXX" },
             { label: "性别", value: "男" },
@@ -204,9 +210,9 @@ export default {
           id: "4",
           startPage: 5,
           endPage: 5,
-          docType: "审计报告",
+          docType: "",
           status: "已复核",
-          formType: "text",
+          formType: "form",
           fields: [
             { label: "报告编号", value: "AUD-2026-001" },
             { label: "审计机构", value: "XXXX会计师事务所" },

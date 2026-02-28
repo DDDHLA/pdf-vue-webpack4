@@ -9,9 +9,9 @@
       <div v-if="!isFullscreen" class="top-header">
         <span class="top-header-title">融资业务-材料复核</span>
         <div class="top-header-actions">
-          <a-button size="small" type="primary">提交</a-button>
-          <a-button size="small">保存</a-button>
-          <a-button size="small">返回</a-button>
+          <a-button size="small" type="primary">智能要素识别</a-button>
+          <a-button size="small">暂存</a-button>
+          <a-button size="small" @click="handleSubmitAndUpload">提交并上传文件</a-button>
         </div>
       </div>
       <!-- 第二行头部：基本信息折叠面板 -->
@@ -277,6 +277,100 @@ export default {
       console.log("拆分方案:", splits);
       this.splitDialogVisible = false;
       this.$message.success(`已生成 ${splits.length} 个拆分段落`);
+    },
+    handleSubmitAndUpload() {
+      const documents = this.analysisDocuments;
+
+      // A. 页码校验
+      // A1. 检查所有页码均已填写
+      const hasEmptyPage = documents.some(
+        (doc) => doc.startPage == null || doc.endPage == null,
+      );
+      if (hasEmptyPage) {
+        this.$message.warning("部分页码尚未填写，请调整");
+        return;
+      }
+
+      // A2. 检查所有页码均在[1, totalPages]范围内
+      const outOfRange = documents.some(
+        (doc) =>
+          doc.startPage < 1 ||
+          doc.endPage > this.totalPages ||
+          doc.startPage > doc.endPage,
+      );
+      if (outOfRange) {
+        this.$message.warning("页码超过实际文件页码范围，请调整");
+        return;
+      }
+
+      // A3. 检查页码范围是否有重叠
+      const overlaps = [];
+      for (let i = 0; i < documents.length; i++) {
+        for (let j = i + 1; j < documents.length; j++) {
+          const a = documents[i];
+          const b = documents[j];
+          if (a.startPage <= b.endPage && b.startPage <= a.endPage) {
+            overlaps.push(
+              `${a.startPage}-${a.endPage}、${b.startPage}-${b.endPage}`,
+            );
+          }
+        }
+      }
+      if (overlaps.length > 0) {
+        this.$message.warning(
+          `${overlaps.join("，")}的页码范围有重复，请调整`,
+        );
+        return;
+      }
+
+      // B. 文档类型校验
+      const hasEmptyDocType = documents.some((doc) => !doc.docType);
+      if (hasEmptyDocType) {
+        this.$message.warning("部分文档类型尚未选择，请调整");
+        return;
+      }
+
+      // C. 文档要素校验
+      const emptyFieldDetails = [];
+      documents.forEach((doc) => {
+        if (doc.fields && doc.fields.length > 0) {
+          const emptyLabels = doc.fields
+            .filter((field) => !field.value && field.value !== 0)
+            .map((field) => field.label);
+          if (emptyLabels.length > 0) {
+            emptyFieldDetails.push({
+              docType: doc.docType,
+              startPage: doc.startPage,
+              endPage: doc.endPage,
+              labels: emptyLabels,
+            });
+          }
+        }
+      });
+      if (emptyFieldDetails.length > 0) {
+        const h = this.$createElement;
+        const listItems = emptyFieldDetails.map((item) =>
+          h("div", { style: { marginBottom: "4px" } }, [
+            `${item.docType}(${item.startPage}-${item.endPage})：${item.labels.join("、")}`,
+          ]),
+        );
+        this.$confirm({
+          title: "存在以下文档类型的要素尚未填写补全，是否确认继续提交?",
+          content: h("div", { style: { marginTop: "8px" } }, listItems),
+          okText: "继续",
+          cancelText: "取消",
+          onOk: () => {
+            this.doSubmit();
+          },
+        });
+        return;
+      }
+
+      this.doSubmit();
+    },
+    doSubmit() {
+      this.$message.success("提交成功");
+      console.log("提交数据:", this.analysisDocuments);
     },
   },
 };
