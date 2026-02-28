@@ -36,29 +36,39 @@
 
     <!-- 中间缩略图列表（所有文件连续滚动） -->
     <div ref="thumbnailList" :style="listStyle">
-      <div
-        v-for="globalPage in totalPages"
-        :key="globalPage"
-        :ref="'thumbnailItem-' + globalPage"
-        :style="getThumbnailStyle(globalPage)"
-        @click="$emit('page-click', globalPage)"
-        @mouseenter="handleMouseEnter($event, globalPage)"
-        @mouseleave="handleMouseLeave($event, globalPage)"
-      >
-        <div :style="thumbnailContentStyle">
-          <div
-            v-if="!thumbnailRendered[globalPage]"
-            :style="{ padding: '60px 20px', textAlign: 'center' }"
-          >
-            <a-spin size="small" />
+      <template v-for="globalPage in totalPages">
+        <div
+          :key="'page-' + globalPage"
+          :ref="'thumbnailItem-' + globalPage"
+          :style="getThumbnailStyle(globalPage)"
+          @click="$emit('page-click', globalPage)"
+          @mouseenter="handleMouseEnter($event, globalPage)"
+          @mouseleave="handleMouseLeave($event, globalPage)"
+        >
+          <div :style="thumbnailContentStyle">
+            <div
+              v-if="!thumbnailRendered[globalPage]"
+              :style="{ padding: '60px 20px', textAlign: 'center' }"
+            >
+              <a-spin size="small" />
+            </div>
+            <canvas
+              v-show="thumbnailRendered[globalPage]"
+              :ref="'thumbnail-' + globalPage"
+            />
           </div>
-          <canvas
-            v-show="thumbnailRendered[globalPage]"
-            :ref="'thumbnail-' + globalPage"
-          />
+          <div :style="pageNumberStyle">第{{ globalPage }}页</div>
         </div>
-        <div :style="pageNumberStyle">第{{ globalPage }}页</div>
-      </div>
+        <div
+          v-if="getDividerType(globalPage)"
+          :key="'divider-' + globalPage"
+          :style="dividerWrapperStyle"
+        >
+          <div :style="getDividerLineStyle(globalPage)"></div>
+          <span :style="dividerTextStyle">分割线</span>
+          <div :style="getDividerLineStyle(globalPage)"></div>
+        </div>
+      </template>
     </div>
 
     <!-- 底部分页导航 -->
@@ -82,7 +92,9 @@
       >
         <a-icon type="left" :style="{ fontSize: '12px', color: '#666' }" />
       </a-button>
-      <div :style="pageIndicatorStyle">{{ currentPage }} / {{ totalPages }}</div>
+      <div :style="pageIndicatorStyle">
+        {{ currentPage }} / {{ totalPages }}
+      </div>
       <a-button
         type="text"
         size="small"
@@ -134,6 +146,10 @@ export default {
     currentPage: {
       type: Number,
       required: true,
+    },
+    analysisDocuments: {
+      type: Array,
+      default: () => [],
     },
   },
   data() {
@@ -261,6 +277,42 @@ export default {
         textAlign: "center",
       };
     },
+    // 文件边界页集合（实线）
+    fileBoundaryPages() {
+      const pages = new Set();
+      for (let i = 0; i < this.fileInfoList.length - 1; i++) {
+        pages.add(this.fileInfoList[i].globalEndPage);
+      }
+      return pages;
+    },
+    // 文档分割边界页集合（虚线）
+    docSplitPages() {
+      const pages = new Set();
+      this.analysisDocuments.forEach((doc) => {
+        if (doc.endPage && doc.endPage < this.totalPages) {
+          pages.add(doc.endPage);
+        }
+      });
+      return pages;
+    },
+    dividerWrapperStyle() {
+      return {
+        display: "flex",
+        alignItems: "center",
+        width: "100%",
+        margin: "6px 0",
+        flexShrink: 0,
+        gap: "8px",
+      };
+    },
+    dividerTextStyle() {
+      return {
+        fontSize: "12px",
+        color: "#999",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      };
+    },
   },
   watch: {
     fileInfoList: {
@@ -272,6 +324,24 @@ export default {
     },
   },
   methods: {
+    // 获取某页之后的分割线类型：'dashed'（虚线）、'solid'（实线）、null（无分割线）
+    // 虚线优先级高于实线（重叠时使用虚线）
+    getDividerType(globalPage) {
+      if (globalPage >= this.totalPages) return null;
+      const isDashed = this.docSplitPages.has(globalPage);
+      const isSolid = this.fileBoundaryPages.has(globalPage);
+      if (isDashed) return "dashed";
+      if (isSolid) return "solid";
+      return null;
+    },
+    getDividerLineStyle(globalPage) {
+      const type = this.getDividerType(globalPage);
+      return {
+        flex: 1,
+        height: "0px",
+        borderTop: type === "dashed" ? "1px dashed #ccc" : "1px solid #ccc",
+      };
+    },
     // 全局页码 → { fileIndex, localPage }
     resolveGlobalPage(globalPage) {
       for (let i = 0; i < this.fileInfoList.length; i++) {

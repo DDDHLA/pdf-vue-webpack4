@@ -51,6 +51,7 @@
           :active-file-index="activeFileIndex"
           :total-pages="totalPages"
           :current-page="currentPage"
+          :analysis-documents="analysisDocuments"
           @page-click="goToPage"
           @file-tab-click="handleFileTabClick"
           @first-page="goToFirstPage"
@@ -103,7 +104,10 @@
           />
         </div>
         <!-- 右侧智能处理面板 -->
-        <analysis-panel v-if="files.length > 0 && !isFullscreen" />
+        <analysis-panel
+          v-if="files.length > 0 && !isFullscreen"
+          @documents-change="handleDocumentsChange"
+        />
       </div>
     </template>
 
@@ -144,6 +148,7 @@ export default {
       infoExpanded: false,
       previewScale: null,
       isFullscreen: false,
+      analysisDocuments: [],
     };
   },
   computed: {
@@ -264,6 +269,9 @@ export default {
     },
     setViewMode(mode) {
       this.viewMode = mode;
+    },
+    handleDocumentsChange(documents) {
+      this.analysisDocuments = documents;
     },
     handleSplitConfirm(splits) {
       console.log("拆分方案:", splits);

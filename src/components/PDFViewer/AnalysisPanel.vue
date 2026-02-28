@@ -225,6 +225,17 @@ export default {
       }));
     });
   },
+  mounted() {
+    this.$emit("documents-change", this.documents);
+  },
+  watch: {
+    documents: {
+      handler(val) {
+        this.$emit("documents-change", val);
+      },
+      deep: true,
+    },
+  },
   computed: {
     isAllExpanded() {
       return this.documents.every((d) => this.activeKeys.includes(d.id));
