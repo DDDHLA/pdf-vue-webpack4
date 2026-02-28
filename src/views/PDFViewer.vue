@@ -1,67 +1,105 @@
 <template>
-  <div ref="viewer" :style="viewerStyle">
+  <div ref="viewer" class="viewer-wrapper" :style="viewerStyle">
     <!-- 上传区域（无文件时显示） -->
     <upload-area v-if="!file" @file-upload="handleFileUpload" />
 
     <!-- PDF 查看器（有文件时显示） -->
     <template v-if="file">
-      <!-- 左侧缩略图面板 -->
-      <thumbnail-panel
-        v-if="sidebarVisible"
-        :file="file"
-        :num-pages="numPages"
-        :current-page="currentPage"
-        @page-click="goToPage"
-        @first-page="goToFirstPage"
-        @prev-page="goToPrevPage"
-        @next-page="goToNextPage"
-        @last-page="goToLastPage"
-      />
-
-      <!-- 右侧主内容区 -->
-      <div ref="container" :style="containerStyle">
-        <!-- 顶部文件名 -->
-        <div :style="headerStyle">
-          文件名称：<span style="color: #ff4d4f">{{ file.name }}</span>
+      <!-- 第一行头部：标题 + 操作按钮 -->
+      <div class="top-header">
+        <span class="top-header-title">融资业务-材料复核</span>
+        <div class="top-header-actions">
+          <a-button size="small" type="primary">提交</a-button>
+          <a-button size="small">保存</a-button>
+          <a-button size="small">返回</a-button>
         </div>
-
-        <!-- PDF 画布 -->
-        <p-d-f-canvas
+      </div>
+      <!-- 第二行头部：基本信息折叠面板 -->
+      <a-collapse
+        :active-key="infoExpanded ? ['info'] : []"
+        :bordered="false"
+        class="info-collapse"
+        @change="(keys) => (infoExpanded = keys.includes('info'))"
+      >
+        <a-collapse-panel key="info" header="基本信息">
+          <a-descriptions :column="2" size="small">
+            <a-descriptions-item label="业务编号"
+              >BIZ-2026-001</a-descriptions-item
+            >
+            <a-descriptions-item label="融资人"
+              >XXXX有限公司</a-descriptions-item
+            >
+            <a-descriptions-item label="业务类型"
+              >流动资金贷款</a-descriptions-item
+            >
+            <a-descriptions-item label="申请金额">500万元</a-descriptions-item>
+            <a-descriptions-item label="申请日期"
+              >2026-02-28</a-descriptions-item
+            >
+            <a-descriptions-item label="经办人">张三</a-descriptions-item>
+          </a-descriptions>
+        </a-collapse-panel>
+      </a-collapse>
+      <!-- 主体内容区 -->
+      <div class="viewer-body">
+        <!-- 左侧缩略图面板 -->
+        <thumbnail-panel
+          v-if="sidebarVisible"
           :file="file"
           :num-pages="numPages"
           :current-page="currentPage"
-          :scale="scale"
-          :preview-scale="previewScale"
-          :rotation="rotation"
-          :view-mode="viewMode"
-          @document-load-success="onDocumentLoadSuccess"
-          @page-load-success="handlePageLoadSuccess"
+          @page-click="goToPage"
+          @first-page="goToFirstPage"
+          @prev-page="goToPrevPage"
+          @next-page="goToNextPage"
+          @last-page="goToLastPage"
         />
 
-        <!-- 底部工具栏 -->
-        <toolbar
-          :scale="scale"
-          :view-mode="viewMode"
-          :sidebar-visible="sidebarVisible"
-          @zoom-in="zoomIn"
-          @zoom-out="zoomOut"
-          @reset-zoom="resetZoom"
-          @rotate="rotatePage"
-          @scale-change="handleScaleChange"
-          @scale-preview="handleScalePreview"
-          @fit-width="handleFitWidth"
-          @fit-height="handleFitHeight"
-          @fit-page="handleFitPage"
-          @fullscreen="handleFullscreen"
-          @toggle-view-mode="setViewMode"
-          @toggle-sidebar="sidebarVisible = !sidebarVisible"
-          @open-split-dialog="splitDialogVisible = true"
-          @open-analysis-dialog="analysisDialogVisible = true"
-          @download-word="downloadWord"
-        />
+        <!-- 右侧主内容区 -->
+        <div ref="container" :style="containerStyle">
+          <!-- 顶部文件名 -->
+          <div :style="headerStyle">
+            文件名称：<span style="color: #ff4d4f">{{ file.name }}</span>
+          </div>
+
+          <!-- PDF 画布 -->
+          <p-d-f-canvas
+            :file="file"
+            :num-pages="numPages"
+            :current-page="currentPage"
+            :scale="scale"
+            :preview-scale="previewScale"
+            :rotation="rotation"
+            :view-mode="viewMode"
+            @document-load-success="onDocumentLoadSuccess"
+            @page-load-success="handlePageLoadSuccess"
+          />
+
+          <!-- 底部工具栏 -->
+          <toolbar
+            :scale="scale"
+            :view-mode="viewMode"
+            :sidebar-visible="sidebarVisible"
+            @zoom-in="zoomIn"
+            @zoom-out="zoomOut"
+            @reset-zoom="resetZoom"
+            @rotate="rotatePage"
+            @scale-change="handleScaleChange"
+            @scale-preview="handleScalePreview"
+            @fit-width="handleFitWidth"
+            @fit-height="handleFitHeight"
+            @fit-page="handleFitPage"
+            @fullscreen="handleFullscreen"
+            @toggle-view-mode="setViewMode"
+            @toggle-sidebar="sidebarVisible = !sidebarVisible"
+            @open-split-dialog="splitDialogVisible = true"
+            @open-analysis-dialog="analysisDialogVisible = true"
+            @download-word="downloadWord"
+          />
+        </div>
+        <!-- 右侧智能处理面板 -->
+        <analysis-panel v-if="file" />
       </div>
-      <!-- 右侧智能处理面板 -->
-      <analysis-panel v-if="file" />
     </template>
 
     <!-- 拆分配置弹窗 -->
@@ -98,6 +136,7 @@ export default {
   data() {
     return {
       splitDialogVisible: false,
+      infoExpanded: true,
       previewScale: null,
     };
   },
@@ -105,6 +144,7 @@ export default {
     viewerStyle() {
       return {
         display: "flex",
+        flexDirection: "column",
         height: "100%",
         overflow: "hidden",
         background: "#f5f5f5",
@@ -207,3 +247,39 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 48px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.top-header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.top-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.info-collapse {
+  flex-shrink: 0;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.viewer-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+</style>
