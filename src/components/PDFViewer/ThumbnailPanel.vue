@@ -36,9 +36,8 @@
 
     <!-- 中间缩略图列表（所有文件连续滚动） -->
     <div ref="thumbnailList" :style="listStyle">
-      <template v-for="globalPage in totalPages">
+      <div v-for="globalPage in totalPages" :key="'page-' + globalPage">
         <div
-          :key="'page-' + globalPage"
           :ref="'thumbnailItem-' + globalPage"
           :style="getThumbnailStyle(globalPage)"
           @click="$emit('page-click', globalPage)"
@@ -59,16 +58,12 @@
           </div>
           <div :style="pageNumberStyle">第{{ globalPage }}页</div>
         </div>
-        <div
-          v-if="getDividerType(globalPage)"
-          :key="'divider-' + globalPage"
-          :style="dividerWrapperStyle"
-        >
+        <div v-if="getDividerType(globalPage)" :style="dividerWrapperStyle">
           <div :style="getDividerLineStyle(globalPage)"></div>
           <span :style="dividerTextStyle">分割线</span>
           <div :style="getDividerLineStyle(globalPage)"></div>
         </div>
-      </template>
+      </div>
     </div>
 
     <!-- 底部分页导航 -->
@@ -300,7 +295,7 @@ export default {
         display: "flex",
         alignItems: "center",
         width: "100%",
-        margin: "6px 0",
+        margin: "10px 0 2px 0",
         flexShrink: 0,
         gap: "8px",
       };
@@ -380,7 +375,7 @@ export default {
         background: isActive ? "#1890ff" : "transparent",
         color: isActive ? "#fff" : "#333",
         transition: "all 0.2s",
-        minWidth: "60px",
+        width: "80px",
       };
     },
     getNavArrowStyle(disabled) {
