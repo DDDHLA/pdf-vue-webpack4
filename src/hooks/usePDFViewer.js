@@ -29,6 +29,29 @@ export function usePDFViewer() {
       },
     },
     methods: {
+      // 从 API 加载 PDF 文件并触发渲染
+      async loadPDFFromApi(url, fileName = "未命名文档.pdf", options = {}) {
+        try {
+          // 获取文件二进制流
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const blob = await response.blob();
+
+          // 将 Blob 转换为 File 对象，以兼容现有的本地文件处理逻辑
+          const file = new File([blob], fileName, { type: "application/pdf" });
+
+          // 触发文件加载和渲染
+          this.handleFilesUpload([file]);
+
+          return file;
+        } catch (error) {
+          console.error("加载远程 PDF 失败:", error);
+          throw error;
+        }
+      },
+
       // 多文件上传处理
       handleFilesUpload(uploadedFiles) {
         this.files = uploadedFiles;

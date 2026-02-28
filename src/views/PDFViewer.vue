@@ -11,7 +11,9 @@
         <div class="top-header-actions">
           <a-button size="small" type="primary">智能要素识别</a-button>
           <a-button size="small">暂存</a-button>
-          <a-button size="small" @click="handleSubmitAndUpload">提交并上传文件</a-button>
+          <a-button size="small" @click="handleSubmitAndUpload"
+            >提交并上传文件</a-button
+          >
         </div>
       </div>
       <!-- 第二行头部：基本信息折叠面板 -->
@@ -202,6 +204,25 @@ export default {
   },
   mounted() {
     document.addEventListener("fullscreenchange", this.onFullscreenChange);
+    // 假设从路由获取业务id
+    // const bizId = this.$route.query.id || "123";
+
+    // // 可以传入 token 等请求头
+    // const options = {
+    //   headers: { Authorization: "Bearer xxx" },
+    // };
+
+    // this.loadPDFFromApi(
+    //   `/api/pdf/download/${bizId}`,
+    //   "融资申请材料.pdf",
+    //   options,
+    // )
+    //   .then(() => {
+    //     this.$message.success("文档加载成功");
+    //   })
+    //   .catch((err) => {
+    //     this.$message.error("文档加载失败");
+    //   });
   },
   beforeDestroy() {
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
@@ -323,9 +344,7 @@ export default {
         }
       }
       if (overlaps.length > 0) {
-        this.$message.warning(
-          `${overlaps.join("，")}的页码范围有重复，请调整`,
-        );
+        this.$message.warning(`${overlaps.join("，")}的页码范围有重复，请调整`);
         return;
       }
 
@@ -357,7 +376,9 @@ export default {
         const h = this.$createElement;
         const listItems = emptyFieldDetails.map((item) =>
           h("div", { style: { marginBottom: "4px" } }, [
-            `${item.docType}(${item.startPage}-${item.endPage})：${item.labels.join("、")}`,
+            `${item.docType}(${item.startPage}-${
+              item.endPage
+            })：${item.labels.join("、")}`,
           ]),
         );
         this.$confirm({
