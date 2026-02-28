@@ -60,6 +60,8 @@
           @download-word="downloadWord"
         />
       </div>
+      <!-- 右侧智能处理面板 -->
+      <analysis-panel v-if="file" />
     </template>
 
     <!-- 拆分配置弹窗 -->
@@ -69,12 +71,6 @@
       :file="file"
       @close="splitDialogVisible = false"
       @confirm="handleSplitConfirm"
-    />
-
-    <!-- 智能分析弹窗 -->
-    <analysis-dialog
-      :visible="analysisDialogVisible"
-      @close="analysisDialogVisible = false"
     />
   </div>
 </template>
@@ -86,7 +82,7 @@ import ThumbnailPanel from "@/components/PDFViewer/ThumbnailPanel.vue";
 import PDFCanvas from "@/components/PDFViewer/PDFCanvas.vue";
 import Toolbar from "@/components/PDFViewer/Toolbar.vue";
 import SplitDialog from "@/components/PDFViewer/SplitDialog.vue";
-import AnalysisDialog from "@/components/PDFViewer/AnalysisDialog.vue";
+import AnalysisPanel from "@/components/PDFViewer/AnalysisPanel.vue";
 
 export default {
   name: "PDFViewer",
@@ -96,13 +92,12 @@ export default {
     PDFCanvas: PDFCanvas,
     Toolbar,
     SplitDialog,
-    AnalysisDialog,
+    AnalysisPanel,
   },
   mixins: [usePDFViewer()],
   data() {
     return {
       splitDialogVisible: false,
-      analysisDialogVisible: false,
       previewScale: null,
     };
   },
