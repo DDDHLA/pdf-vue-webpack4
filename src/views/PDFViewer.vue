@@ -6,7 +6,7 @@
     <!-- PDF 查看器（有文件时显示） -->
     <template v-if="files.length > 0">
       <!-- 第一行头部：标题 + 操作按钮 -->
-      <div class="top-header">
+      <div v-if="!isFullscreen" class="top-header">
         <span class="top-header-title">融资业务-材料复核</span>
         <div class="top-header-actions">
           <a-button size="small" type="primary">提交</a-button>
@@ -16,6 +16,7 @@
       </div>
       <!-- 第二行头部：基本信息折叠面板 -->
       <a-collapse
+        v-if="!isFullscreen"
         :active-key="infoExpanded ? ['info'] : []"
         :bordered="false"
         class="info-collapse"
@@ -62,9 +63,7 @@
         <div ref="container" :style="containerStyle">
           <!-- 顶部文件名 -->
           <div :style="headerStyle">
-            文件名称：<span style="color: #ff4d4f">{{
-              currentFileName
-            }}</span>
+            文件名称：<span style="color: #ff4d4f">{{ currentFileName }}</span>
           </div>
 
           <!-- PDF 画布 -->
@@ -104,7 +103,7 @@
           />
         </div>
         <!-- 右侧智能处理面板 -->
-        <analysis-panel v-if="files.length > 0" />
+        <analysis-panel v-if="files.length > 0 && !isFullscreen" />
       </div>
     </template>
 
@@ -142,8 +141,9 @@ export default {
   data() {
     return {
       splitDialogVisible: false,
-      infoExpanded: true,
+      infoExpanded: false,
       previewScale: null,
+      isFullscreen: false,
     };
   },
   computed: {
@@ -195,7 +195,16 @@ export default {
       };
     },
   },
+  mounted() {
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
+  },
+  beforeDestroy() {
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+  },
   methods: {
+    onFullscreenChange() {
+      this.isFullscreen = !!document.fullscreenElement;
+    },
     handlePageLoadSuccess(dimensions) {
       this.pageDimensions = dimensions;
     },
