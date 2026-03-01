@@ -26,33 +26,28 @@
           </a-dropdown>
         </div>
       </div>
-      <!-- 第二行头部：基本信息折叠面板 -->
-      <a-collapse
-        v-if="!isFullscreen"
-        :active-key="infoExpanded ? ['info'] : []"
-        :bordered="false"
-        class="info-collapse"
-        @change="(keys) => (infoExpanded = keys.includes('info'))"
-      >
-        <a-collapse-panel key="info" header="基本信息">
-          <a-descriptions :column="2" size="small">
-            <a-descriptions-item label="业务编号"
-              >BIZ-2026-001</a-descriptions-item
-            >
-            <a-descriptions-item label="融资人"
-              >XXXX有限公司</a-descriptions-item
-            >
-            <a-descriptions-item label="业务类型"
-              >流动资金贷款</a-descriptions-item
-            >
-            <a-descriptions-item label="申请金额">500万元</a-descriptions-item>
-            <a-descriptions-item label="申请日期"
-              >2026-02-28</a-descriptions-item
-            >
-            <a-descriptions-item label="经办人">张三</a-descriptions-item>
-          </a-descriptions>
-        </a-collapse-panel>
-      </a-collapse>
+      <!-- 第二行头部：基本信息 -->
+      <div v-if="!isFullscreen" class="info-bar">
+        <div class="info-bar-left">
+          <span class="info-item"><span class="info-label">业务编号：</span>BIZ-2026-001</span>
+          <span class="info-item"><span class="info-label">融资人：</span>XXXX有限公司</span>
+          <span class="info-item"><span class="info-label">业务类型：</span>流动资金贷款</span>
+        </div>
+        <a-button type="link" size="small" @click="infoExpanded = !infoExpanded">
+          {{ infoExpanded ? '收起' : '更多' }}
+          <a-icon :type="infoExpanded ? 'up' : 'down'" />
+        </a-button>
+      </div>
+      <div v-if="!isFullscreen && infoExpanded" class="info-detail">
+        <a-descriptions :column="3" size="small">
+          <a-descriptions-item label="业务编号">BIZ-2026-001</a-descriptions-item>
+          <a-descriptions-item label="融资人">XXXX有限公司</a-descriptions-item>
+          <a-descriptions-item label="业务类型">流动资金贷款</a-descriptions-item>
+          <a-descriptions-item label="申请金额">500万元</a-descriptions-item>
+          <a-descriptions-item label="申请日期">2026-02-28</a-descriptions-item>
+          <a-descriptions-item label="经办人">张三</a-descriptions-item>
+        </a-descriptions>
+      </div>
       <!-- 主体内容区 -->
       <div class="viewer-body">
         <!-- 左侧缩略图面板 -->
@@ -613,6 +608,39 @@ export default {
   flex-shrink: 0;
   background: #fff;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 40px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.info-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.info-item {
+  font-size: 13px;
+  color: #333;
+}
+
+.info-label {
+  color: #999;
+}
+
+.info-detail {
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
 .viewer-body {

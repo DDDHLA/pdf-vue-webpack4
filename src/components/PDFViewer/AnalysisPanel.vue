@@ -368,8 +368,12 @@ export default {
 }
 
 .action-bar {
-  padding: 12px 16px 0;
+  padding: 0 16px;
+  height: 48px;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .action-bar-title {
