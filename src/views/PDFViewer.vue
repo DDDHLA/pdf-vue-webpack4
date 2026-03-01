@@ -121,6 +121,31 @@
       @close="splitDialogVisible = false"
       @confirm="handleSplitConfirm"
     />
+
+    <!-- 确认文档名称弹窗 -->
+    <a-modal
+      title="确认文档名称"
+      :visible="fileNameDialogVisible"
+      width="800px"
+      @ok="confirmSubmitFiles"
+      @cancel="fileNameDialogVisible = false"
+      okText="确认提交"
+    >
+      <a-table
+        :columns="fileNameColumns"
+        :data-source="fileNameTableData"
+        :row-key="(record) => record.id"
+        :pagination="false"
+        size="small"
+      >
+        <template slot="index" slot-scope="text, record, index">
+          {{ index + 1 }}
+        </template>
+        <template slot="fileName" slot-scope="text, record">
+          <a-input v-model="record.fileName" addon-after=".pdf" />
+        </template>
+      </a-table>
+    </a-modal>
   </div>
 </template>
 
@@ -151,6 +176,13 @@ export default {
       previewScale: null,
       isFullscreen: false,
       analysisDocuments: [],
+      fileNameDialogVisible: false,
+      fileNameTableData: [],
+      fileNameColumns: [
+        { title: '序号', key: 'index', scopedSlots: { customRender: 'index' }, width: 80, align: 'center' },
+        { title: '文档类型', dataIndex: 'docType', key: 'docType', width: 250 },
+        { title: '文档名称', dataIndex: 'fileName', key: 'fileName', scopedSlots: { customRender: 'fileName' } }
+      ]
     };
   },
   computed: {
@@ -388,17 +420,104 @@ export default {
           okText: "继续",
           cancelText: "取消",
           onOk: () => {
-            this.doSubmit();
+            this.openFileNameDialog();
           },
         });
         return;
       }
 
+      this.openFileNameDialog();
+    },
+
+    // 生成带后缀的文件名
+    generateUniqueFileName(docType, baseFileName, existingNames) {
+      const lastDotIndex = baseFileName.lastIndexOf(".");
+      const nameWithoutExt = lastDotIndex > -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+      let proposedName = `${docType}_${nameWithoutExt}`;
+
+      // 如果没有重名，直接返回
+      if (!existingNames.has(proposedName)) {
+        return proposedName;
+      }
+
+      // 如果重名，添加数字后缀
+      let counter = 1;
+      while (existingNames.has(`${proposedName}_${counter}`)) {
+        counter++;
+      }
+      return `${proposedName}_${counter}`;
+    },
+
+    openFileNameDialog() {
+      // 获取当前正在查看的文件名
+      const baseFileName = this.currentFileName || "未命名文件.pdf";
+
+      const lastDotIndex = baseFileName.lastIndexOf(".");
+      const nameWithoutExt = lastDotIndex > -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+
+      // 预先统计各个建议名称出现的次数，以便判断是否需要加后缀
+      const nameCounts = {};
+      const validDocs = this.analysisDocuments.filter(doc => doc.docType);
+
+      validDocs.forEach(doc => {
+        const proposedName = `${doc.docType}_${nameWithoutExt}`;
+        nameCounts[proposedName] = (nameCounts[proposedName] || 0) + 1;
+      });
+
+      // 用于记录在分配后缀时，每个重名名称目前分配到了几号
+      const currentNameIndex = {};
+
+      this.fileNameTableData = validDocs.map(doc => {
+        const proposedName = `${doc.docType}_${nameWithoutExt}`;
+        let finalName = proposedName;
+
+        // 如果该名称在列表中出现超过1次，则需要加后缀 _1, _2...
+        if (nameCounts[proposedName] > 1) {
+          currentNameIndex[proposedName] = (currentNameIndex[proposedName] || 0) + 1;
+          finalName = `${proposedName}_${currentNameIndex[proposedName]}`;
+        }
+
+        return {
+          id: doc.id,
+          docType: doc.docType,
+          startPage: doc.startPage,
+          endPage: doc.endPage,
+          fileName: finalName
+        };
+      });
+
+      if (this.fileNameTableData.length === 0) {
+        this.$message.warning("没有可提交的有效文档");
+        return;
+      }
+
+      this.fileNameDialogVisible = true;
+    },
+
+    confirmSubmitFiles() {
+      // 检查文件名是否为空
+      const hasEmptyName = this.fileNameTableData.some(item => !item.fileName || item.fileName.trim() === '');
+      if (hasEmptyName) {
+        this.$message.warning("文档名称不能为空");
+        return;
+      }
+
+      // 检查同一批次中是否有同名文件
+      const names = this.fileNameTableData.map(item => item.fileName);
+      const uniqueNames = new Set(names);
+      if (names.length !== uniqueNames.size) {
+        this.$message.warning("同一批次中不能有同名的文档，请修改");
+        return;
+      }
+
+      this.fileNameDialogVisible = false;
       this.doSubmit();
     },
+
     doSubmit() {
       this.$message.success("提交成功");
       console.log("提交数据:", this.analysisDocuments);
+      console.log("文件命名数据:", this.fileNameTableData);
     },
   },
 };
