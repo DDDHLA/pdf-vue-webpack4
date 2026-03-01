@@ -9,11 +9,21 @@
       <div v-if="!isFullscreen" class="top-header">
         <span class="top-header-title">融资业务-材料复核</span>
         <div class="top-header-actions">
-          <a-button size="small" type="primary">智能要素识别</a-button>
+          <a-button size="small" type="primary" @click="handleSmartIdentify">智能要素识别</a-button>
           <a-button size="small">暂存</a-button>
           <a-button size="small" @click="handleSubmitAndUpload"
             >提交并上传文件</a-button
           >
+          <a-button size="small" type="primary" @click="handleSubmit">提交</a-button>
+          <a-dropdown>
+            <a-button size="small" type="primary">
+              导出 <a-icon type="down" />
+            </a-button>
+            <a-menu slot="overlay" @click="handleExport">
+              <a-menu-item key="original">原文件</a-menu-item>
+              <a-menu-item key="processed">处理后文件</a-menu-item>
+            </a-menu>
+          </a-dropdown>
         </div>
       </div>
       <!-- 第二行头部：基本信息折叠面板 -->
@@ -107,6 +117,7 @@
         </div>
         <!-- 右侧智能处理面板 -->
         <analysis-panel
+          ref="analysisPanel"
           v-if="files.length > 0 && !isFullscreen"
           @documents-change="handleDocumentsChange"
         />
@@ -176,6 +187,7 @@ export default {
       previewScale: null,
       isFullscreen: false,
       analysisDocuments: [],
+      smartIdentifyVisible: false,
       fileNameDialogVisible: false,
       fileNameTableData: [],
       fileNameColumns: [
@@ -331,6 +343,47 @@ export default {
       this.splitDialogVisible = false;
       this.$message.success(`已生成 ${splits.length} 个拆分段落`);
     },
+
+    // 处理智能要素识别点击
+    handleSmartIdentify() {
+      // 从子组件获取当前选中的文档项
+      let checkedDocs = [];
+      if (this.$refs.analysisPanel) {
+        const checkedKeys = this.$refs.analysisPanel.checkedKeys;
+        checkedDocs = this.analysisDocuments.filter(doc => checkedKeys.includes(doc.id));
+      }
+
+      if (checkedDocs.length === 0) {
+        this.$message.warning("请先在右侧面板勾选需要识别的文档");
+        return;
+      }
+
+      const h = this.$createElement;
+      this.$confirm({
+        width: 500,
+        title: h('div', [
+          'A将重新分析您所选的',
+          h('span', { style: 'color: red;' }, `${checkedDocs.length}`),
+          '个文件。提取关键要素。'
+        ]),
+        icon: "info-circle",
+        content: h('div', [
+          '请确保文件类型正确，此过程通常面要20-30秒，请制心等待。'
+        ]),
+        okText: "继续",
+        cancelText: "取消",
+        onOk: () => {
+          this.confirmSmartIdentify(checkedDocs);
+        },
+      });
+    },
+
+    confirmSmartIdentify(checkedDocs) {
+      // 这里打印选中的文档列表信息
+      console.log("当前选中的文档列表信息:", checkedDocs);
+      this.$message.success("识别指令已发送，请在控制台查看选中的文档");
+    },
+
     handleSubmitAndUpload() {
       const documents = this.analysisDocuments;
 
@@ -519,6 +572,16 @@ export default {
       console.log("提交数据:", this.analysisDocuments);
       console.log("文件命名数据:", this.fileNameTableData);
     },
+
+    handleSubmit() {
+      console.log("当前列表的所有数据 (提交):", this.analysisDocuments);
+      this.$message.success("提交点击事件已触发");
+    },
+
+    handleExport(e) {
+      console.log(`当前列表的所有数据 (导出 ${e.key === 'original' ? '原文件' : '处理后文件'}):`, this.analysisDocuments);
+      this.$message.success(`导出事件已触发: ${e.key === 'original' ? '原文件' : '处理后文件'}`);
+    }
   },
 };
 </script>
